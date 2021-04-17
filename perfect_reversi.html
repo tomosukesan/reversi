@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完成盤.リバーシ</title>
+    <h2 id="mode">たちともの.リバーシ</h2>
+</head>
+<body>
+    <div align="right"><input type="button" id="wait" onclick="game.turnback()" value="待った！！"></div>
+    <p></p>
+    <canvas id="canvas" onclick="game.catchClick(event)" width="400" height="400"></canvas>
+    <div id="turn"></div>
+    <input type="button" id="pass" onclick="game.pass()" value="パス" style="background-color:lightsteelblue;"></div>
+    <div align="right"><input type="button" id="start" onclick="game.start()" value="最初から" style="background-color: lightyellow;"></div>
+    <div id="display"></div>
+    <style>/*CSSにて背景設定*/
+        body{background-color: aliceblue; text-align:center;};
+    </style>
+    <script>
+        const wait=document.getElementById('wait');
+        const canvas=document.getElementById('canvas');
+        const ctx=canvas.getContext('2d');
+        //player管理
+        const player1={color:"black",number:1,reversi:2,inner:"Player2(白)の番です"};
+        const player2={color:"white",number:2,reversi:1,inner:"Player1(黒)の番です"};
+        //ゲームの管理
+        const game={
+            player:player1,//player1が先攻
+            //盤面表示
+            makeBoard:function(){
+                ctx.fillStyle='green';
+                ctx.fillRect(0,0,400,400);
+                for(let i=1;i<8;i++){
+                    ctx.beginPath();
+                    ctx.moveTo(50*i,0);
+                    ctx.lineTo(50*i,400);
+                    ctx.stroke();
+                    ctx.moveTo(0,50*i);
+                    ctx.lineTo(400,50*i);
+                    ctx.stroke();
+                }
+            },
+            //初期設置の石を表示
+            initialDrawStone:function(){
+                //黒
+                ctx.beginPath();
+                ctx.arc(175,175,20,0,Math.PI*2,true);//円の中心は25,75,125,175=50x-25
+                ctx.arc(225,225,20,0,Math.PI*2,true);
+                ctx.fillStyle="black";
+                ctx.fill();
+                this.stone[3][3]=1;
+                this.stone[4][4]=1;
+                //白
+                ctx.beginPath();
+                ctx.arc(175,225,20,0,Math.PI*2,true);//円の中心は25,75,125,175=50x-25
+                ctx.arc(225,175,20,0,Math.PI*2,true);
+                ctx.fillStyle="white";
+                ctx.fill();
+                this.stone[3][4]=2;
+                this.stone[4][3]=2;
+                //ボタン色
+                wait.style.background='tomato';
+            },
+            position:{X:0,Y:0},//X,Yは円の中心
+            //石を置くために円の中心を計算している関数
+            catchClick:function(event){
+                this.changeStone=[];//ひっくり返すデータの初期化
+                var x=event.offsetX;
+                var y=event.offsetY;
+                x=x-x%50+25;
+                y=y-y%50+25;
+                this.position={X:x,Y:y};//x,yは円の中心
+                var result=this.canPutStone();
+                if(result==true)this.drawStone();
+                wait.style.background='tomato';
+                display.innerHTML=this.stone[0]+"<br>"+this.stone[1]+"<br>"+this.stone[2]+"<br>"+this.stone[3]+"<br>"+this.stone[4]+"<br>"+this.stone[5]+"<br>"+this.stone[6]+"<br>"+this.stone[7];
+                this.calculate();
+            },
+            drawStone:function(){//50:catchClick関数より呼び出し。石を置く関数。
+                ctx.beginPath();
+                ctx.arc(this.position.X,this.position.Y,20,0,Math.PI*2,true);
+                if(this.player==player1){
+                    ctx.fillStyle=player1.color;
+                    this.stone[(this.position.Y-25)/50][(this.position.X-25)/50]=1;
+                    turn.innerHTML="Player2(白)の番です";//順番を表示
+                    this.player=player2;//交代
+                }else{
+                    ctx.fillStyle=player2.color;
+                    this.stone[(this.position.Y-25)/50][(this.position.X-25)/50]=2;
+                    turn.innerHTML="Player1(黒)の番です";
+                    this.player=player1;
+                }
+                ctx.fill();
+                console.log("置いた座標："+(this.position.X-25)/50+","+(this.position.Y-25)/50);
+                this.memory=[this.position.Y,this.position.X,0];//25,75,125,175...
+                display.innerHTML=this.stone;
+            },
+            memory:[],
+            stone:[//stone配列にてデータを保持・管理
+                //1:black 2:white
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0]],
+            changeStone:[],
+            //石を置けるかの判定
+            check:[{x:0,y:-1},{x:0,y:1},{x:1,y:0},{x:-1,y:0},{x:1,y:-1},{x:1,y:1},{x:-1,y:-1},{x:-1,y:1}],
+            canPutStone:function(){
+                this.changeStone=[];
+                var y=(this.position.Y-25)/50;//配列用にx,yを0~7の数値に変換
+                var x=(this.position.X-25)/50;
+                if(this.stone[y][x]!=0){
+                    return false;
+                }
+                let flg=false;
+
+                for(let i=0;i<8;i++){//①
+                    //②
+                    for(let loop=0,aroundX=x,aroundY=y;0<=aroundX && aroundX<=7 && 0<=aroundY && aroundY<=7;loop++){
+                        aroundX += this.check[i].x;
+                        aroundY += this.check[i].y;
+                        if(aroundX<0 || 7<aroundX || aroundY<0 || 7<aroundY){
+                            if(loop===0)break;
+                            else{
+                                for(let j=0;j<loop;j++){
+                                    this.changeStone.pop();
+                                }
+                                break;
+                            }
+                        }
+                        if(loop===0){//１回目のループのとき
+                            if(this.stone[aroundY][aroundX]!==this.player.reversi)break;//相手の石がない場合①へ
+                            else{
+                                this.changeStone.push({x:aroundX,y:aroundY});//相手の石があれば②へ
+                                continue;//２回目のループへ飛ばす。飛ばしたところでiの値は変わらない
+                            }
+                        }else{//２回目のループ以降
+                            if(this.stone[aroundY][aroundX]===this.player.reversi){//相手の石なら追加
+                                this.changeStone.push({x:aroundX,y:aroundY});
+                                continue;//②へ戻り、数値を変えて戻ってくる
+                            }
+                            if(this.stone[aroundY][aroundX]===this.player.number){
+                                num=this.changeStone;
+                                this.reverse(num);
+                                flg=true;
+                                break;
+                            }else{
+                                for(let j=0;j<loop;j++){
+                                    this.changeStone.pop();
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                return flg;
+            },
+            reverse:function(num){
+                for(let i=0;i<num.length;i++){
+                    let x=num[i].x;
+                    let y=num[i].y;
+                    console.log("変わった座標："+x+","+y);
+
+                    ctx.beginPath();
+                    ctx.arc(x*50+25,y*50+25,20,0,2*Math.PI);
+                    if(this.player==player1){
+                        ctx.fillStyle=player1.color;
+                        this.stone[y][x]=1;
+                    }else{
+                        ctx.fillStyle=player2.color;
+                        this.stone[y][x]=2;
+                    }
+                    ctx.fill();
+                }
+            },
+            turnback:function(){
+                wait.style.background='lightpink';
+                console.log("待ったボタンが押されました");
+                //置いたところを消す役割
+                ctx.beginPath();
+                ctx.arc(this.memory[1],this.memory[0],22,0,Math.PI*2,true);
+                ctx.fillStyle="green";
+                ctx.fill();
+                this.stone[(this.memory[0]-25)/50][(this.memory[1]-25)/50]=0;
+
+                //色が変わった石を戻す作業
+                for(i=0;i<this.changeStone.length;i++){
+                    let x=this.changeStone[i].x;
+                    let y=this.changeStone[i].y;
+                    ctx.beginPath();
+                    ctx.arc(x*50+25,y*50+25,20,0,Math.PI*2,true);
+                    ctx.fillStyle=this.player.color;
+                    ctx.fill();
+                    this.stone[y][x]=this.player.number;
+                    turn.innerHTML=this.player.inner;
+                    display.innerHTML=game.stone[0]+"<br>"+game.stone[1]+"<br>"+game.stone[2]+"<br>"+game.stone[3]+"<br>"+game.stone[4]+"<br>"+game.stone[5]+"<br>"+game.stone[6]+"<br>"+game.stone[7];
+                }
+                if(this.player==player1)this.player=player2;
+                else this.player=player1;
+
+                //初期化
+                this.memory=[];
+                this.changeStone=[];
+            },
+            start:function(){
+                let result=confirm('最初からにします。よろしいですか。');
+                if(result){
+                    for(let i=0;i<8;i++){
+                        for(let j=0;j<8;j++){
+                            this.stone[i][j]=0;
+                        }
+                    }
+                    this.stone[3][3]=1;
+                    this.stone[4][4]=1;
+                    this.stone[3][4]=2;
+                    this.stone[4][3]=2;
+                    this.makeBoard();
+                    this.initialDrawStone();
+                    turn.innerHTML="Player1(黒)の番です";
+                    this.player=player1;
+                    display.innerHTML=game.stone[0]+"<br>"+game.stone[1]+"<br>"+game.stone[2]+"<br>"+game.stone[3]+"<br>"+game.stone[4]+"<br>"+game.stone[5]+"<br>"+game.stone[6]+"<br>"+game.stone[7];
+                }
+            },
+            pass:function(){
+                turn.innerHTML=this.player.inner;
+                if(this.player==player1)this.player=player2;
+                else this.player=player1;
+            },
+            calculate:function(){
+                var blackStonePieces=0;
+                var whiteStonePieces=0;
+                for(let i=0;i<8;i++){
+                    var blackStone=this.stone[i].filter(function(pieces){return pieces==1});
+                    var whiteStone=this.stone[i].filter(function(pieces){return pieces==2});
+
+                    blackStonePieces +=blackStone.length;
+                    whiteStonePieces +=whiteStone.length;
+                }
+                console.log("黒："+blackStonePieces+",白："+whiteStonePieces);
+                if(blackStonePieces==0)turn.innerHTML="ゲーム終了。Player2(白)の勝ちです。";
+                if(whiteStonePieces==0)turn.innerHTML="ゲーム終了。Player1(黒)の勝ちです。";
+                if(blackStonePieces+whiteStonePieces==64){
+                    if(blackStonePieces > whiteStonePieces)turn.innerHTML="Player1(黒)の勝ちです。黒："+blackStonePieces+",白："+whiteStonePieces;
+                    else turn.innerHTML="Player2(白)の勝ちです。黒 "+blackStonePieces+"：白 "+whiteStonePieces;
+                }
+            }
+        }
+        game.makeBoard();
+        game.initialDrawStone();
+
+        const turn=document.getElementById('turn');
+        turn.innerHTML="Player1(黒)の番です";
+
+        const display=document.getElementById('display');
+        display.innerHTML=game.stone[0]+"<br>"+game.stone[1]+"<br>"+game.stone[2]+"<br>"+game.stone[3]+"<br>"+game.stone[4]+"<br>"+game.stone[5]+"<br>"+game.stone[6]+"<br>"+game.stone[7];
+
+
+    </script>
+</body>
+</html>
